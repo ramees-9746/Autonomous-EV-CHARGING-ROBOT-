@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Charging Robot</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            background: #f4f4f4; 
+            padding: 20px; 
+        }
+        .container { 
+            max-width: 400px; 
+            margin: auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); 
+        }
+        h2 { color: #333; }
+
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .toggle-btn {
+            background: #007bff; 
+            color: white;
+            padding: 30px;
+            font-size: 20px;
+            
+        }
+
+        .toggle-btn.active {
+            background: #dc3545;
+            padding: 30px;
+            
+        }
+
+        .port-btn {
+            background: linear-gradient(to right, #ff7e5f, #feb47b); 
+            color: white;
+            font-weight: bold;
+        }
+
+        .port-btn:hover {
+            background: linear-gradient(to right, #e96443, #904e95);
+        }
+
+        #status { 
+            font-size: 18px; 
+            margin-top: 20px; 
+            color: #333; 
+        }
+
+        .gauge-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        canvas {
+            width: 150px;
+            height: 150px;
+        }
+
+        #battery-text {
+            position: absolute;
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+    <script>
+        let isRunning = false;
+
+        function toggleStartStop() {
+            isRunning = !isRunning;
+            let button = document.getElementById("startStopBtn");
+            button.innerText = isRunning ? "STOP" : "START";
+            button.classList.toggle("active", isRunning);
+            sendCommand(isRunning ? "start" : "stop");
+        }
+
+        function sendCommand(command) {
+            fetch('/action', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, 
+                body: 'command=' + command 
+            })
+            .then(response => response.text())
+            .then(data => { 
+                let statusText = 'Robot Status: ';
+                switch(command) {
+                    case 'start': statusText += 'Moving to Car...'; break;
+                    case 'stop': statusText += 'Returning to Charger...'; break;
+                    case 'slot1': statusText += 'Moving to Slot 1...'; break;
+                    case 'slot2': statusText += 'Moving to Slot 2...'; break;
+                }
+                document.getElementById('status').innerText = statusText;
+            });
+        }
+
+        function fetchSensorData() {
+            fetch('/data')
+                .then(response => response.json())
+                .then(data => { 
+                    let batteryLevel = parseInt(data.sensor_value) || 0;
+                    drawBatteryGauge(batteryLevel);
+                });
+        }
+
+        function drawBatteryGauge(percentage) {
+            let canvas = document.getElementById("batteryGauge");
+            let ctx = canvas.getContext("2d");
+            let radius = canvas.width / 2;
+            let center = radius;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Background Circle
+            ctx.beginPath();
+            ctx.arc(center, center, radius - 10, 0, 2 * Math.PI);
+            ctx.strokeStyle = "#ddd";
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            // Foreground Circle (Battery Level)
+            let startAngle = -Math.PI / 2; // Start at top
+            let endAngle = startAngle + (percentage / 100) * (2 * Math.PI);
+            
+            ctx.beginPath();
+            ctx.arc(center, center, radius - 10, startAngle, endAngle);
+            ctx.strokeStyle = "#28a745";
+            ctx.lineWidth = 10;
+            ctx.lineCap = "round";
+            ctx.stroke();
+
+            // Display Battery Percentage
+            let batteryText = document.getElementById("battery-text");
+            batteryText.innerText = percentage + "%";
+        }
+
+        window.onload = function() {
+            fetchSensorData();
+        };
+
+        setInterval(fetchSensorData, 3000); 
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h2>EV CHARGING ROBOT</h2>
+        
+        <div class="button-container">
+            <button class="port-btn" onclick="sendCommand('slot1')">Move to Slot 1</button>
+            <button class="port-btn" onclick="sendCommand('slot2')">Move to Slot 2</button>
+        </div>
+
+        <button id="startStopBtn" class="toggle-btn" onclick="toggleStartStop()">START</button>
+
+        <p id="status">Robot Status: Idle</p>
+
+        <div class="gauge-container">
+            <canvas id="batteryGauge" width="150" height="150"></canvas>
+        <div id="battery-text">0%</div>
+    </div>
+</body>
+</html>
